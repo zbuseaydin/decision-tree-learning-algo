@@ -5,9 +5,11 @@ import math
 # examples = [{id: <id>, Patrons: <Patrons>, Hungry: <Hungry>, Type: <Type> ... }, {.....}, {.....}]
 
 class Node:
-    def __init__(self):
-        self.label = ""
+    def __init__(self, goal_value=""):     
         self.children = []
+        self.attribute = ""
+        self.attr_value = ""
+        self.goal_value = goal_value  # if leaf node
 
 
 def entropy(q):     # entropy of a boolean random variable q = pos / (pos+neg)
@@ -63,7 +65,33 @@ def plurality_value(examples):
             positive_count += 1
         else:
             negative_count += 1
-    return positive if positive_count > negative_count else negative
+    return positive if positive_count >= negative_count else negative
+
+
+def eliminate_attributes(node):
+    if len(node.children) == 0:
+        return
+    child0 = node.children[0]
+    for child in node.children:
+        if child0.goal_value != child.goal_value:
+            return
+    if child0.goal_value == "":
+        return
+    node.goal_value = child0.goal_value
+    node.children = []
+
+
+def pruning(root):
+    for i in range(depth+1):
+        queue = [root]
+        while queue:
+            level_size = len(queue)
+            while level_size > 0:
+                node = queue.pop(0)
+                eliminate_attributes(node)
+                level_size -= 1
+                for child in node.children:
+                    queue += [child]
 
 
 def check_if_all_same(examples):
@@ -78,6 +106,8 @@ def arg_max_importance(attributes, examples):
     curr_max = float('-inf')
     max_arg = ""
     for a in attributes:
+        if a == goal or a == id_ignored:
+            continue
         gain = importance(a, attributes, examples)
         if gain > curr_max:
             curr_max = gain
@@ -103,15 +133,19 @@ def create_new_attributes(attribute, attributes):
 
 
 def decision_tree_learning(attributes, examples, parent_examples):
+    global depth
+    depth = 1
     if len(examples) == 0:
-        return plurality_value(parent_examples)
+        tree = Node(plurality_value(parent_examples))
+        return tree
 
     all_same_class = check_if_all_same(examples)
     if all_same_class[0]:
-        return all_same_class[1]
+        tree = Node(all_same_class[1])
+        return tree
     
-    if len(attributes) == 0:
-        return plurality_value(examples)
+    if len(attributes) == 2:    # id and goal attributes are ignored
+        return Node(plurality_value(examples))
 
     attribute = arg_max_importance(attributes, examples)
     tree = Node()
@@ -119,9 +153,10 @@ def decision_tree_learning(attributes, examples, parent_examples):
         new_examples = create_new_examples(attribute, val, examples)
         new_attributes = create_new_attributes(attribute, attributes)
         subtree = decision_tree_learning(new_attributes, new_examples, examples)
-        if isinstance(subtree, Node):
-            subtree.label = f"{attribute}: {val}"
+        subtree.attribute = attribute
+        subtree.attr_value = val
         tree.children.append(subtree)
+    depth += 1
     return tree
 
 
@@ -132,8 +167,6 @@ def get_attributes_from_examples(examples, first_line):
         attributes[column] = []
     for example in examples:
         for key in example.keys():
-            if key == goal:
-                continue
             if example[key] in attributes[key]:
                 continue
             attributes[key].append(example[key])
@@ -147,42 +180,78 @@ def bfs_print(root):
         while level_size > 0:
             node = queue.pop(0)
             level_size -= 1
-            if isinstance(node, str):
-                print(node, end=" ")
-                continue
-            print(node.label, end=" ")
+            print(f"{node.attribute}:{node.attr_value}({node.goal_value})", end=" ")
             for child in node.children:
                 queue += [child]
         print()
 
 
-if __name__ == "__main__":
+def get_data_from_csv(g, pos, neg, file_name):
     global goal     # EatOur or TitanicSurvived ...
     global positive # True or 0 ...
     global negative 
-    goal = "WillWait"
-    positive = "Yes"
-    negative = "No"
-    first_line = ["Patrons", "Hungry", "Type", "Fri/Sat", "WaitEstimate", "Alternate", "Reservation", "Bar", "Raining"]
-
-    ex_dict = {
-        "Alternate": ["Yes", "Yes", "No", "Yes", "Yes", "No", "No", "No", "No", "Yes", "No", "Yes"],
-        "Bar": ["No", "No", "Yes", "No", "No", "Yes", "Yes", "No", "Yes", "Yes", "No", "Yes"],
-        "Fri/Sat": ["No", "No", "No", "Yes", "Yes", "No", "No", "No", "Yes", "Yes", "No", "Yes"],
-        "Hungry": ["Yes", "Yes", "No", "Yes", "No", "Yes", "No", "Yes", "No", "Yes", "No", "Yes"],
-        "Patrons": ["Some", "Full", "Some", "Full", "Full", "Some", "None", "Some", "Full", "Full", "None", "Full"], 
-        "Raining": ["No", "No", "No", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "No", "No"],
-        "Reservation": ["Yes", "No", "No", "No", "Yes", "Yes", "No", "Yes", "No", "Yes", "No", "No"],
-        "Type": ["French", "Thai", "Burger", "Thai", "French", "Italian", "Burger", "Thai", "Burger", "Italian", "Thai", "Burger"],
-        "WaitEstimate": ["0-10", "30-60", "0-10", "10-30", ">60", "0-10", "0-10", "0-10", ">60", "10-30", "0-10", "30-60"],
-        "WillWait": ["Yes", "No", "Yes", "Yes", "No", "Yes", "No", "Yes", "No", "No", "No", "Yes"]
-    }
+    goal = g
+    positive = pos
+    negative = neg
+    data_file = open(file_name, "r")
+    columns = data_file.readline().strip().split(",")
     examples = []
-    for i in range(len(ex_dict["Alternate"])):
-        example = dict()
-        for key in ex_dict.keys():
-            example[key] = ex_dict[key][i]
-        examples.append(example)
-    attributes = get_attributes_from_examples(examples, first_line)
-    root = decision_tree_learning(attributes, examples, examples)
-    bfs_print(root)
+    for line in data_file.readlines():
+        data = line.strip().split(",")
+        data_dict = dict()
+        for i in range(len(columns)):
+            data_dict[columns[i]] = data[i]
+        examples.append(data_dict)
+    return examples, columns
+
+
+def calculate_error(data, root):
+    incorrect_count = 0
+    for example in data:
+        if example[goal] != find_val(example, root):
+            incorrect_count += 1
+    return incorrect_count / len(data)
+
+
+def k_fold(k, examples, test_data):
+    partial_len = int(len(examples)/k)
+
+    e_gen = 0
+    test_errors = []
+    for i in range(k):
+        train_data = examples[ : (i * partial_len)] + examples[(i+1) * partial_len: ]
+        validate_data = examples[i * partial_len: (i+1) * partial_len]
+        root = train(train_data)
+        pruning(root)
+#        bfs_print(root)
+        print(i, calculate_error(validate_data, root))
+        e_gen += (calculate_error(validate_data, root))
+        test_errors.append(calculate_error(test_data, root))
+    return e_gen/k, test_errors
+
+
+def find_val(example, node):
+    if node.goal_value != "":
+        return node.goal_value
+    for child in node.children:
+        if example.get(child.attribute) == child.attr_value:
+            return find_val(example, child)   
+
+
+def test(test_data, root):
+    return calculate_error(test_data, root)
+
+
+def train(train_data):
+    attributes = get_attributes_from_examples(train_data, columns)
+    return decision_tree_learning(attributes, train_data, train_data)
+
+
+if __name__ == "__main__":
+    global columns
+    global id_ignored
+    examples, columns = get_data_from_csv("Loan_Status", "Y", "N", "training.csv")
+    id_ignored = columns[0]
+
+    test_data = get_data_from_csv("Loan_Status", "Y", "N", "test.csv")[0]
+    print(k_fold(5, examples, test_data))
