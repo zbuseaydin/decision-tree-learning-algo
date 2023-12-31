@@ -1,8 +1,9 @@
 import math
+import matplotlib.pyplot as plt
 
-# attributes = {Type: ["French",, Italian, "Thai",], Patrons: [], Hungry: [], ... Fri/Sat: []}
-# attribute_values = Type: ["French",, Italian, "Thai",]   //ex. Type
-# examples = [{id: <id>, Patrons: <Patrons>, Hungry: <Hungry>, Type: <Type> ... }, {.....}, {.....}]
+# attributes = {Gender: ["Male", "Female"], Edacation: ["Graduate", "Not Graduate"], ...}
+# attribute_values = for Gender: ["Male", "Female"]  
+# examples = [{Loan_ID: <id>, Gender: <Gender>, ... }, {...}, {...}]
 
 class Node:
     def __init__(self, goal_value=""):     
@@ -20,8 +21,7 @@ def entropy(q):     # entropy of a boolean random variable q = pos / (pos+neg)
     return -1 * (q * math.log(q, 2) + (1-q) * math.log(1-q, 2))
 
 
-def get_attribute_probabilities(attribute, attributes, examples):
-    # {"French",: [4, 6], } pos, neg
+def attribute_counts(attribute, attributes, examples):
     attr_dict = {}
     for attr_val in attributes[attribute]:
         attr_dict[attr_val] = [0, 0]
@@ -30,33 +30,37 @@ def get_attribute_probabilities(attribute, attributes, examples):
             attr_dict[example.get(attribute)][0] += 1
         else:
             attr_dict[example.get(attribute)][1] += 1
-    return attr_dict
+    return attr_dict    # ex: {"Male": [4, 6]} pos, neg
 
 
-def get_examples_pos_probability(examples):
-    pos_prob = 0
+# get the probability of positives in all data
+def positive_prob(examples):    
+    positives = 0
     for example in examples:
         if example[goal] == positive:
-            pos_prob += 1 
-    return pos_prob/len(examples)
+            positives += 1 
+    return positives/len(examples)
 
 
+# remainder = sum((pk+nk)/(p+n) * entropy(pk/(pk+nk)))
 def remainder(attribute, attributes, examples):
     attr_sum = 0
-    attr_dict = get_attribute_probabilities(attribute, attributes, examples)
+    attr_dict = attribute_counts(attribute, attributes, examples)
     for attribute in attr_dict.keys():
         positives = attr_dict[attribute][0]
         negatives = attr_dict[attribute][1]
+        total = positives + negatives
         if positives + negatives == 0:
             continue
-        attr_sum += (positives + negatives) * entropy(positives / (positives + negatives))
+        attr_sum += (total) * entropy(positives / total)
     return 1/len(examples) * attr_sum
 
 
 def importance(attribute, attributes, examples):
-    return entropy(get_examples_pos_probability(examples)) - remainder(attribute, attributes, examples)
+    return entropy(positive_prob(examples)) - remainder(attribute, attributes, examples)
 
 
+# return the more occuring goal value
 def plurality_value(examples):
     positive_count = 0
     negative_count = 0
@@ -68,6 +72,8 @@ def plurality_value(examples):
     return positive if positive_count >= negative_count else negative
 
 
+# if all the children nodes eventually result in
+# the same goal value, get rid of them
 def eliminate_attributes(node):
     if len(node.children) == 0:
         return
@@ -81,7 +87,8 @@ def eliminate_attributes(node):
     node.children = []
 
 
-def pruning(root):
+# if there are unnecessary nodes, get rid of them
+def clear_tree(root):
     for i in range(depth+1):
         queue = [root]
         while queue:
@@ -102,6 +109,8 @@ def check_if_all_same(examples):
     return True, first_example
 
 
+# get the attribute which provides the
+# largest information gain
 def arg_max_importance(attributes, examples):
     curr_max = float('-inf')
     max_arg = ""
@@ -115,6 +124,7 @@ def arg_max_importance(attributes, examples):
     return max_arg
 
 
+# create new examples list with entries that have <attribute_value>
 def create_new_examples(attribute, attribute_value, parent_examples):
     new_examples = []
     for example in parent_examples:
@@ -123,6 +133,7 @@ def create_new_examples(attribute, attribute_value, parent_examples):
     return new_examples
 
 
+# create new attributes list that doesn't have the <attribute>
 def create_new_attributes(attribute, attributes):
     new_attributes = {}
     for attr in attributes.keys():
@@ -161,7 +172,7 @@ def decision_tree_learning(attributes, examples, parent_examples):
 
 
 # {"Attribute1": [attr_val1, attr_val2, ...], ...}
-def get_attributes_from_examples(examples, first_line):
+def get_attributes(examples, first_line):
     attributes = {}
     for column in first_line:
         attributes[column] = []
@@ -187,9 +198,9 @@ def bfs_print(root):
 
 
 def get_data_from_csv(g, pos, neg, file_name):
-    global goal     # EatOur or TitanicSurvived ...
-    global positive # True or 0 ...
-    global negative 
+    global goal     # Loan_Status
+    global positive # "Y"
+    global negative # "N"
     goal = g
     positive = pos
     negative = neg
@@ -208,43 +219,49 @@ def get_data_from_csv(g, pos, neg, file_name):
 def calculate_error(data, root):
     incorrect_count = 0
     for example in data:
-        if example[goal] != find_val(example, root):
+        if example[goal] != find_goal_value(example, root):
             incorrect_count += 1
     return incorrect_count / len(data)
 
 
 def k_fold(k, examples, test_data):
-    partial_len = int(len(examples)/k)
-
+    part_len = int(len(examples)/k)
     e_gen = 0
     test_errors = []
+    validation_errors = []
     for i in range(k):
-        train_data = examples[ : (i * partial_len)] + examples[(i+1) * partial_len: ]
-        validate_data = examples[i * partial_len: (i+1) * partial_len]
+        train_data = examples[ : (i * part_len)] + examples[(i+1) * part_len: ]
+        validate_data = examples[i * part_len: (i+1) * part_len]
         root = train(train_data)
-        pruning(root)
-#        bfs_print(root)
-        print(i, calculate_error(validate_data, root))
-        e_gen += (calculate_error(validate_data, root))
+        clear_tree(root)
+        if i == 2:
+            bfs_print(root)
+        validation_error = calculate_error(validate_data, root)
+        e_gen += validation_error
+        validation_errors.append(validation_error)
         test_errors.append(calculate_error(test_data, root))
-    return e_gen/k, test_errors
+    return e_gen/k, validation_errors, test_errors
 
 
-def find_val(example, node):
+def find_goal_value(example, node):
     if node.goal_value != "":
         return node.goal_value
     for child in node.children:
         if example.get(child.attribute) == child.attr_value:
-            return find_val(example, child)   
-
-
-def test(test_data, root):
-    return calculate_error(test_data, root)
+            return find_goal_value(example, child)   
 
 
 def train(train_data):
-    attributes = get_attributes_from_examples(train_data, columns)
+    attributes = get_attributes(train_data, columns)
     return decision_tree_learning(attributes, train_data, train_data)
+
+
+def plot_graph(x, y, xname, yname, graph_name):
+    plt.plot(x, y)
+    plt.xlabel(xname)
+    plt.ylabel(yname)
+    plt.title(graph_name)
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -254,4 +271,10 @@ if __name__ == "__main__":
     id_ignored = columns[0]
 
     test_data = get_data_from_csv("Loan_Status", "Y", "N", "test.csv")[0]
-    print(k_fold(5, examples, test_data))
+    k_fold_error, validation_errors, test_errors = k_fold(5, examples, test_data)
+    trees = ["Tree0", "Tree1", "Tree2", "Tree3", "Tree4"]
+    plot_graph(trees, validation_errors, "Trees", "Validation Errors", "")
+    plot_graph(trees, test_errors, "Trees", "Test Errors", "")
+    print("Test_errors:", test_errors)
+    print("Validation_errors:", validation_errors)
+    print("average", k_fold_error)
