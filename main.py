@@ -1,7 +1,7 @@
 import math
 import matplotlib.pyplot as plt
 
-# attributes = {Gender: ["Male", "Female"], Edacation: ["Graduate", "Not Graduate"], ...}
+# attributes = {Gender: ["Male", "Female"], Education: ["Graduate", "Not Graduate"], ...}
 # attribute_values = for Gender: ["Male", "Female"]  
 # examples = [{Loan_ID: <id>, Gender: <Gender>, ... }, {...}, {...}]
 
