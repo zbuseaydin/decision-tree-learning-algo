@@ -21,7 +21,7 @@ In total, there were 511 entries in the dataset. They were splitted into 2: 86 f
 
 ## Error Plots
 ### Validation Errors:
-![validation_errors](https://github.com/zbuseaydin/decision-tree-learning-algo/blob/main/validation_errors.png) \
+![validation_errors](https://github.com/zbuseaydin/decision-tree-learning-algo/blob/main/images/validation_errors.png) \
 Here, each tree that is generated at each iteration during k-fold cross validation is validated and the errors can be seen in the plot.
 
 The errors of each tree are as follows:
@@ -36,7 +36,7 @@ The overall error is the average =
 
 
 ### Test Errors:
-![test_errors](https://github.com/zbuseaydin/decision-tree-learning-algo/blob/main/test_errors.png) \
+![test_errors](https://github.com/zbuseaydin/decision-tree-learning-algo/blob/main/images/test_errors.png) \
 Each tree is also tested with the test set.
 The errors are as follows:
 - Tree0: 0.22093023255813954
@@ -48,5 +48,5 @@ The errors are as follows:
 
 ## Final Decision Tree
 Since the second tree (Tree2) gives the smallest errors, it is the best one. It can be illustrated as:
-![final_tree](https://github.com/zbuseaydin/decision-tree-learning-algo/blob/main/final_decision_tree.png)
+![final_tree](https://github.com/zbuseaydin/decision-tree-learning-algo/blob/main/images/final_decision_tree.png)
 
