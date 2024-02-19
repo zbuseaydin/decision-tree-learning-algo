@@ -184,19 +184,6 @@ def get_attributes(examples, first_line):
     return attributes
 
 
-def bfs_print(root):
-    queue = [root]
-    while queue:
-        level_size = len(queue)
-        while level_size > 0:
-            node = queue.pop(0)
-            level_size -= 1
-            print(f"{node.attribute}:{node.attr_value}({node.goal_value})", end=" ")
-            for child in node.children:
-                queue += [child]
-        print()
-
-
 def get_data_from_csv(g, pos, neg, file_name):
     global goal     # Loan_Status
     global positive # "Y"
@@ -234,8 +221,6 @@ def k_fold(k, examples, test_data):
         validate_data = examples[i * part_len: (i+1) * part_len]
         root = train(train_data)
         clear_tree(root)
-        if i == 2:
-            bfs_print(root)
         validation_error = calculate_error(validate_data, root)
         e_gen += validation_error
         validation_errors.append(validation_error)
@@ -275,6 +260,4 @@ if __name__ == "__main__":
     trees = ["Tree0", "Tree1", "Tree2", "Tree3", "Tree4"]
     plot_graph(trees, validation_errors, "Trees", "Validation Errors", "")
     plot_graph(trees, test_errors, "Trees", "Test Errors", "")
-    print("Test_errors:", test_errors)
-    print("Validation_errors:", validation_errors)
-    print("average", k_fold_error)
+
